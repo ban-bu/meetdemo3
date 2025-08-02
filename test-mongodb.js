@@ -4,63 +4,60 @@
  */
 
 const mongoose = require('mongoose');
+require('dotenv').config();
 
-// 测试 MongoDB 连接
-async function testMongoConnection(mongoUri) {
+// MongoDB连接测试
+const testMongoDBConnection = async () => {
     try {
-        console.log('🔌 正在连接 MongoDB...');
-        console.log('连接地址:', mongoUri.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'));
+        console.log('🔍 正在测试MongoDB连接...');
         
-        await mongoose.connect(mongoUri);
-        console.log('✅ MongoDB 连接成功！');
+        // 检查环境变量
+        if (!process.env.MONGODB_URI) {
+            console.log('❌ 未找到MONGODB_URI环境变量');
+            console.log('请在Railway仪表板中设置MONGODB_URI环境变量');
+            return;
+        }
         
-        // 测试创建集合和文档
-        const testSchema = new mongoose.Schema({
-            message: String,
-            timestamp: { type: Date, default: Date.now }
+        console.log('📡 连接字符串:', process.env.MONGODB_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'));
+        
+        // 连接数据库
+        await mongoose.connect(process.env.MONGODB_URI, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
         });
         
-        const TestModel = mongoose.model('Test', testSchema);
+        console.log('✅ MongoDB连接成功!');
         
-        // 插入测试数据
-        const testDoc = new TestModel({
-            message: 'MongoDB 连接测试成功'
+        // 测试数据库操作
+        const db = mongoose.connection;
+        console.log('📊 数据库名称:', db.name);
+        console.log('🔗 连接状态:', db.readyState === 1 ? '已连接' : '未连接');
+        
+        // 创建测试集合
+        const testCollection = db.collection('test');
+        await testCollection.insertOne({ 
+            test: true, 
+            timestamp: new Date(),
+            message: 'MongoDB连接测试成功'
         });
         
-        const saved = await testDoc.save();
-        console.log('✅ 测试数据插入成功:', saved);
+        console.log('✅ 数据库写入测试成功!');
         
-        // 查询测试数据
-        const found = await TestModel.findById(saved._id);
-        console.log('✅ 测试数据查询成功:', found);
+        // 清理测试数据
+        await testCollection.deleteOne({ test: true });
+        console.log('🧹 测试数据已清理');
         
-        // 删除测试数据
-        await TestModel.findByIdAndDelete(saved._id);
-        console.log('✅ 测试数据清理完成');
-        
-        console.log('🎉 MongoDB 数据库测试完全通过！');
+        await mongoose.connection.close();
+        console.log('🔌 连接已关闭');
         
     } catch (error) {
-        console.error('❌ MongoDB 连接失败:', error.message);
-        if (error.message.includes('authentication failed')) {
-            console.log('💡 提示：请检查用户名和密码是否正确');
-        }
-        if (error.message.includes('network')) {
-            console.log('💡 提示：请检查网络连接和IP白名单设置');
-        }
-    } finally {
-        await mongoose.disconnect();
-        console.log('🔌 数据库连接已关闭');
+        console.error('❌ MongoDB连接失败:', error.message);
+        console.log('💡 请检查:');
+        console.log('   1. MONGODB_URI环境变量是否正确');
+        console.log('   2. 网络连接是否正常');
+        console.log('   3. 数据库用户权限是否正确');
     }
-}
+};
 
-// 从命令行参数获取连接字符串
-const mongoUri = process.argv[2];
-
-if (!mongoUri) {
-    console.log('用法: node test-mongodb.js "你的MongoDB连接字符串"');
-    console.log('示例: node test-mongodb.js "mongodb+srv://zhangaa802:你的密码@cluster0.twgfyce.mongodb.net/vibe-meeting?retryWrites=true&w=majority&appName=Cluster0"');
-    process.exit(1);
-}
-
-testMongoConnection(mongoUri);
+// 运行测试
+testMongoDBConnection();
